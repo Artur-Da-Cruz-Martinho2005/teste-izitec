@@ -1,0 +1,727 @@
+Project Inscreve_AO {
+  database_type: "PostgreSQL"
+  Note: "Modelo inicial do Inscreve.AO - Plataforma multi-instituição para criação, publicação e gestão de formulários e candidaturas."
+}
+
+/* =========================================================
+   01. ADMINISTRAÇÃO IZI
+   ========================================================= */
+
+Table usuarios_izi {
+  id uuid [pk, default: `gen_random_uuid()`]
+  nome varchar(100) [not null]
+  apelido varchar(100)
+  email varchar(150) [not null, unique]
+  telefone varchar(30)
+  senha varchar(255) [not null]
+  foto varchar(500)
+  cargo varchar(150)
+  status varchar(30) [not null, default: 'ATIVO']
+  email_verificado_em timestamp
+  ultimo_acesso_em timestamp
+  criado_em timestamp [not null, default: `now()`]
+  atualizado_em timestamp [not null, default: `now()`]
+  eliminado_em timestamp
+
+  Indexes {
+    status
+    email
+  }
+}
+
+Table perfis_izi {
+  id uuid [pk, default: `gen_random_uuid()`]
+  nome varchar(100) [not null]
+  descricao text
+  status varchar(30) [not null, default: 'ATIVO']
+  criado_em timestamp [not null, default: `now()`]
+  atualizado_em timestamp [not null, default: `now()`]
+
+  Indexes {
+    nome [unique]
+    status
+  }
+}
+
+Table permissoes_izi {
+  id uuid [pk, default: `gen_random_uuid()`]
+  nome varchar(150) [not null]
+  chave varchar(150) [not null, unique]
+  modulo varchar(100) [not null]
+  descricao text
+  criado_em timestamp [not null, default: `now()`]
+  atualizado_em timestamp [not null, default: `now()`]
+
+  Indexes {
+    modulo
+    chave
+  }
+}
+
+Table usuario_perfil_izi {
+  id uuid [pk, default: `gen_random_uuid()`]
+  usuario_izi_id uuid [not null]
+  perfil_izi_id uuid [not null]
+  criado_em timestamp [not null, default: `now()`]
+
+  Indexes {
+    (usuario_izi_id, perfil_izi_id) [unique]
+  }
+}
+
+Table perfil_permissao_izi {
+  id uuid [pk, default: `gen_random_uuid()`]
+  perfil_izi_id uuid [not null]
+  permissao_izi_id uuid [not null]
+  criado_em timestamp [not null, default: `now()`]
+
+  Indexes {
+    (perfil_izi_id, permissao_izi_id) [unique]
+  }
+}
+
+
+/* =========================================================
+   02. INSTITUIÇÕES
+   ========================================================= */
+
+Table instituicoes {
+  id uuid [pk, default: `gen_random_uuid()`]
+  nome varchar(200) [not null]
+  nome_comercial varchar(200)
+  sigla varchar(50)
+  tipo varchar(50) [not null]
+  nif varchar(50)
+  email varchar(150)
+  telefone varchar(30)
+  telefone_alternativo varchar(30)
+  website varchar(255)
+  logo varchar(500)
+  descricao text
+
+  pais varchar(100)
+  provincia varchar(100)
+  municipio varchar(100)
+  endereco text
+
+  status varchar(30) [not null, default: 'ATIVA']
+
+  criado_em timestamp [not null, default: `now()`]
+  atualizado_em timestamp [not null, default: `now()`]
+  eliminado_em timestamp
+
+  Indexes {
+    nome
+    nif [unique]
+    status
+    tipo
+  }
+}
+
+Table usuarios_instituicoes {
+  id uuid [pk, default: `gen_random_uuid()`]
+  instituicao_id uuid [not null]
+  nome varchar(100) [not null]
+  apelido varchar(100)
+  email varchar(150) [not null]
+  telefone varchar(30)
+  senha varchar(255) [not null]
+  foto varchar(500)
+  cargo varchar(150)
+  status varchar(30) [not null, default: 'ATIVO']
+  email_verificado_em timestamp
+  ultimo_acesso_em timestamp
+  criado_em timestamp [not null, default: `now()`]
+  atualizado_em timestamp [not null, default: `now()`]
+  eliminado_em timestamp
+
+  Indexes {
+    instituicao_id
+    (instituicao_id, email) [unique]
+    status
+  }
+}
+
+Table perfis_instituicao {
+  id uuid [pk, default: `gen_random_uuid()`]
+  instituicao_id uuid [not null]
+  nome varchar(100) [not null]
+  descricao text
+  status varchar(30) [not null, default: 'ATIVO']
+  criado_em timestamp [not null, default: `now()`]
+  atualizado_em timestamp [not null, default: `now()`]
+
+  Indexes {
+    (instituicao_id, nome) [unique]
+    status
+  }
+}
+
+Table permissoes_instituicao {
+  id uuid [pk, default: `gen_random_uuid()`]
+  nome varchar(150) [not null]
+  chave varchar(150) [not null, unique]
+  modulo varchar(100) [not null]
+  descricao text
+  criado_em timestamp [not null, default: `now()`]
+  atualizado_em timestamp [not null, default: `now()`]
+
+  Indexes {
+    modulo
+    chave
+  }
+}
+
+Table usuario_perfil_instituicao {
+  id uuid [pk, default: `gen_random_uuid()`]
+  usuario_instituicao_id uuid [not null]
+  perfil_instituicao_id uuid [not null]
+  criado_em timestamp [not null, default: `now()`]
+
+  Indexes {
+    (usuario_instituicao_id, perfil_instituicao_id) [unique]
+  }
+}
+
+Table perfil_permissao_instituicao {
+  id uuid [pk, default: `gen_random_uuid()`]
+  perfil_instituicao_id uuid [not null]
+  permissao_instituicao_id uuid [not null]
+  criado_em timestamp [not null, default: `now()`]
+
+  Indexes {
+    (perfil_instituicao_id, permissao_instituicao_id) [unique]
+  }
+}
+
+
+/* =========================================================
+   03. CANDIDATOS
+   ========================================================= */
+
+Table candidatos {
+  id uuid [pk, default: `gen_random_uuid()`]
+  nome varchar(100) [not null]
+  apelido varchar(100)
+  data_nascimento date
+  genero varchar(30)
+
+  documento_tipo varchar(50)
+  documento_numero varchar(100)
+
+  nacionalidade varchar(100)
+
+  pais varchar(100)
+  provincia varchar(100)
+  municipio varchar(100)
+  endereco text
+
+  foto varchar(500)
+
+  status varchar(30) [not null, default: 'ATIVO']
+
+  criado_em timestamp [not null, default: `now()`]
+  atualizado_em timestamp [not null, default: `now()`]
+  eliminado_em timestamp
+
+  Indexes {
+    documento_numero
+    status
+  }
+}
+
+Table contas_candidatos {
+  id uuid [pk, default: `gen_random_uuid()`]
+  candidato_id uuid [not null, unique]
+
+  email varchar(150) [not null, unique]
+  telefone varchar(30)
+
+  senha varchar(255) [not null]
+
+  email_verificado_em timestamp
+  telefone_verificado_em timestamp
+
+  ultimo_acesso_em timestamp
+
+  status varchar(30) [not null, default: 'ATIVO']
+
+  criado_em timestamp [not null, default: `now()`]
+  atualizado_em timestamp [not null, default: `now()`]
+  eliminado_em timestamp
+
+  Indexes {
+    email
+    telefone
+    status
+  }
+}
+
+
+/* =========================================================
+   04. FORMULÁRIOS
+   ========================================================= */
+
+Table formularios {
+  id uuid [pk, default: `gen_random_uuid()`]
+
+  instituicao_id uuid [not null]
+
+  nome varchar(200) [not null]
+  codigo varchar(100) [not null]
+  descricao text
+  finalidade text
+
+  tipo_acesso varchar(30) [not null, default: 'PUBLICO']
+
+  status varchar(30) [not null, default: 'RASCUNHO']
+
+  versao_atual_id uuid
+
+  criado_por uuid [not null]
+  publicado_em timestamp
+  encerrado_em timestamp
+
+  criado_em timestamp [not null, default: `now()`]
+  atualizado_em timestamp [not null, default: `now()`]
+  eliminado_em timestamp
+
+  Indexes {
+    instituicao_id
+    (instituicao_id, codigo) [unique]
+    status
+    tipo_acesso
+  }
+}
+
+
+/* =========================================================
+   05. VERSÕES DOS FORMULÁRIOS
+   ========================================================= */
+
+Table formulario_versoes {
+  id uuid [pk, default: `gen_random_uuid()`]
+
+  formulario_id uuid [not null]
+
+  numero int [not null]
+  nome varchar(200)
+  descricao text
+
+  status varchar(30) [not null, default: 'RASCUNHO']
+
+  publicado_em timestamp
+
+  criado_por uuid [not null]
+
+  criado_em timestamp [not null, default: `now()`]
+  atualizado_em timestamp [not null, default: `now()`]
+
+  Indexes {
+    formulario_id
+    (formulario_id, numero) [unique]
+    status
+  }
+}
+
+
+/* =========================================================
+   06. ETAPAS
+   ========================================================= */
+
+Table formulario_etapas {
+  id uuid [pk, default: `gen_random_uuid()`]
+
+  formulario_versao_id uuid [not null]
+
+  nome varchar(200) [not null]
+  descricao text
+
+  ordem int [not null]
+
+  obrigatoria boolean [not null, default: true]
+
+  status varchar(30) [not null, default: 'ATIVO']
+
+  criado_em timestamp [not null, default: `now()`]
+  atualizado_em timestamp [not null, default: `now()`]
+
+  Indexes {
+    formulario_versao_id
+    (formulario_versao_id, ordem) [unique]
+  }
+}
+
+
+/* =========================================================
+   07. SEÇÕES
+   ========================================================= */
+
+Table formulario_secoes {
+  id uuid [pk, default: `gen_random_uuid()`]
+
+  etapa_id uuid [not null]
+
+  nome varchar(200) [not null]
+  descricao text
+
+  ordem int [not null]
+
+  status varchar(30) [not null, default: 'ATIVO']
+
+  criado_em timestamp [not null, default: `now()`]
+  atualizado_em timestamp [not null, default: `now()`]
+
+  Indexes {
+    etapa_id
+    (etapa_id, ordem) [unique]
+  }
+}
+
+
+/* =========================================================
+   08. CAMPOS DINÂMICOS
+   ========================================================= */
+
+Table formulario_campos {
+  id uuid [pk, default: `gen_random_uuid()`]
+
+  secao_id uuid [not null]
+
+  codigo varchar(100) [not null]
+
+  nome varchar(150) [not null]
+  rotulo varchar(200) [not null]
+  descricao text
+
+  tipo varchar(50) [not null]
+
+  ordem int [not null]
+
+  obrigatorio boolean [not null, default: false]
+  visivel boolean [not null, default: true]
+  editavel boolean [not null, default: true]
+
+  configuracao jsonb
+  valor_padrao jsonb
+
+  placeholder varchar(255)
+
+  status varchar(30) [not null, default: 'ATIVO']
+
+  criado_em timestamp [not null, default: `now()`]
+  atualizado_em timestamp [not null, default: `now()`]
+
+  Indexes {
+    secao_id
+    (secao_id, codigo) [unique]
+    (secao_id, ordem) [unique]
+    tipo
+    status
+  }
+}
+
+
+/* =========================================================
+   09. OPÇÕES DOS CAMPOS
+   ========================================================= */
+
+Table campo_opcoes {
+  id uuid [pk, default: `gen_random_uuid()`]
+
+  campo_id uuid [not null]
+
+  valor varchar(255) [not null]
+  rotulo varchar(255) [not null]
+  descricao text
+
+  ordem int [not null]
+
+  status varchar(30) [not null, default: 'ATIVO']
+
+  criado_em timestamp [not null, default: `now()`]
+  atualizado_em timestamp [not null, default: `now()`]
+
+  Indexes {
+    campo_id
+    (campo_id, valor) [unique]
+    (campo_id, ordem) [unique]
+  }
+}
+
+
+/* =========================================================
+   10. REGRAS E DEPENDÊNCIAS
+   ========================================================= */
+
+Table campo_regras {
+  id uuid [pk, default: `gen_random_uuid()`]
+
+  campo_id uuid [not null]
+
+  tipo_regra varchar(50) [not null]
+
+  valor jsonb
+
+  acao varchar(50) [not null]
+
+  mensagem text
+
+  ordem int [not null, default: 1]
+
+  status varchar(30) [not null, default: 'ATIVO']
+
+  criado_em timestamp [not null, default: `now()`]
+  atualizado_em timestamp [not null, default: `now()`]
+
+  Indexes {
+    campo_id
+    tipo_regra
+    status
+  }
+}
+
+Table campo_dependencias {
+  id uuid [pk, default: `gen_random_uuid()`]
+
+  campo_id uuid [not null]
+  campo_origem_id uuid [not null]
+
+  operador varchar(50) [not null]
+
+  valor jsonb
+
+  acao varchar(50) [not null]
+
+  criado_em timestamp [not null, default: `now()`]
+  atualizado_em timestamp [not null, default: `now()`]
+
+  Indexes {
+    campo_id
+    campo_origem_id
+  }
+}
+
+
+/* =========================================================
+   11. PUBLICAÇÃO
+   ========================================================= */
+
+Table formulario_publicacoes {
+  id uuid [pk, default: `gen_random_uuid()`]
+
+  formulario_id uuid [not null]
+  formulario_versao_id uuid [not null]
+
+  data_inicio timestamp
+  data_fim timestamp
+
+  limite_submissoes bigint
+  total_submissoes bigint [not null, default: 0]
+
+  status varchar(30) [not null, default: 'PUBLICADO']
+
+  criado_em timestamp [not null, default: `now()`]
+  atualizado_em timestamp [not null, default: `now()`]
+
+  Indexes {
+    formulario_id
+    formulario_versao_id
+    status
+    data_inicio
+    data_fim
+  }
+}
+
+Table formulario_links {
+  id uuid [pk, default: `gen_random_uuid()`]
+
+  formulario_id uuid [not null]
+  publicacao_id uuid [not null]
+
+  slug varchar(150) [not null, unique]
+  token varchar(255) [not null, unique]
+
+  url_publica varchar(500) [not null]
+
+  status varchar(30) [not null, default: 'ATIVO']
+
+  data_inicio timestamp
+  data_fim timestamp
+
+  criado_em timestamp [not null, default: `now()`]
+  atualizado_em timestamp [not null, default: `now()`]
+
+  Indexes {
+    formulario_id
+    publicacao_id
+    status
+    slug
+    token
+  }
+}
+
+
+/* =========================================================
+   12. RESPONDENTES SEM CONTA
+   ========================================================= */
+
+Table respondentes {
+  id uuid [pk, default: `gen_random_uuid()`]
+
+  nome varchar(200)
+  email varchar(150)
+  telefone varchar(30)
+
+  identificador varchar(150)
+
+  criado_em timestamp [not null, default: `now()`]
+  atualizado_em timestamp [not null, default: `now()`]
+
+  Indexes {
+    email
+    telefone
+    identificador
+  }
+}
+
+
+/* =========================================================
+   13. SUBMISSÕES
+   ========================================================= */
+
+Table submissoes {
+  id uuid [pk, default: `gen_random_uuid()`]
+
+  formulario_id uuid [not null]
+  formulario_versao_id uuid [not null]
+  publicacao_id uuid
+
+  candidato_id uuid
+  respondente_id uuid
+
+  codigo varchar(100) [not null, unique]
+
+  status varchar(50) [not null, default: 'SUBMETIDA']
+
+  ip varchar(100)
+  user_agent text
+
+  submetido_em timestamp
+
+  criado_em timestamp [not null, default: `now()`]
+  atualizado_em timestamp [not null, default: `now()`]
+
+  Indexes {
+    formulario_id
+    formulario_versao_id
+    publicacao_id
+    candidato_id
+    respondente_id
+    status
+    submetido_em
+  }
+}
+
+
+/* =========================================================
+   14. RESPOSTAS
+   ========================================================= */
+
+Table submissao_respostas {
+  id uuid [pk, default: `gen_random_uuid()`]
+
+  submissao_id uuid [not null]
+  campo_id uuid [not null]
+
+  valor_texto text
+  valor_numerico bigint
+  valor_decimal decimal(20,6)
+  valor_data date
+  valor_booleano boolean
+  valor_json jsonb
+
+  criado_em timestamp [not null, default: `now()`]
+  atualizado_em timestamp [not null, default: `now()`]
+
+  Indexes {
+    submissao_id
+    campo_id
+    (submissao_id, campo_id) [unique]
+  }
+}
+
+
+/* =========================================================
+   15. RELACIONAMENTOS
+   ========================================================= */
+
+/* IZI */
+
+Ref: usuario_perfil_izi.usuario_izi_id > usuarios_izi.id
+Ref: usuario_perfil_izi.perfil_izi_id > perfis_izi.id
+
+Ref: perfil_permissao_izi.perfil_izi_id > perfis_izi.id
+Ref: perfil_permissao_izi.permissao_izi_id > permissoes_izi.id
+
+
+/* Instituições */
+
+Ref: usuarios_instituicoes.instituicao_id > instituicoes.id
+
+Ref: perfis_instituicao.instituicao_id > instituicoes.id
+
+Ref: usuario_perfil_instituicao.usuario_instituicao_id > usuarios_instituicoes.id
+Ref: usuario_perfil_instituicao.perfil_instituicao_id > perfis_instituicao.id
+
+Ref: perfil_permissao_instituicao.perfil_instituicao_id > perfis_instituicao.id
+Ref: perfil_permissao_instituicao.permissao_instituicao_id > permissoes_instituicao.id
+
+
+/* Candidatos */
+
+Ref: contas_candidatos.candidato_id - candidatos.id
+
+
+/* Formulários */
+
+Ref: formularios.instituicao_id > instituicoes.id
+Ref: formularios.criado_por > usuarios_instituicoes.id
+
+Ref: formulario_versoes.formulario_id > formularios.id
+Ref: formulario_versoes.criado_por > usuarios_instituicoes.id
+
+Ref: formulario_etapas.formulario_versao_id > formulario_versoes.id
+
+Ref: formulario_secoes.etapa_id > formulario_etapas.id
+
+Ref: formulario_campos.secao_id > formulario_secoes.id
+
+Ref: campo_opcoes.campo_id > formulario_campos.id
+
+Ref: campo_regras.campo_id > formulario_campos.id
+
+Ref: campo_dependencias.campo_id > formulario_campos.id
+Ref: campo_dependencias.campo_origem_id > formulario_campos.id
+
+
+/* Publicação */
+
+Ref: formulario_publicacoes.formulario_id > formularios.id
+Ref: formulario_publicacoes.formulario_versao_id > formulario_versoes.id
+
+Ref: formulario_links.formulario_id > formularios.id
+Ref: formulario_links.publicacao_id > formulario_publicacoes.id
+
+
+/* Submissões */
+
+Ref: submissoes.formulario_id > formularios.id
+Ref: submissoes.formulario_versao_id > formulario_versoes.id
+Ref: submissoes.publicacao_id > formulario_publicacoes.id
+
+Ref: submissoes.candidato_id > candidatos.id
+Ref: submissoes.respondente_id > respondentes.id
+
+Ref: submissao_respostas.submissao_id > submissoes.id
+Ref: submissao_respostas.campo_id > formulario_campos.id

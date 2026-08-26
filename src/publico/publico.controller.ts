@@ -1,0 +1,2 @@
+import { Body, Controller, Get, Param, Post, Req } from '@nestjs/common'; import { PublicoService } from './publico.service';
+@Controller('publico/formularios') export class PublicoController{constructor(private s:PublicoService){} @Get(':slug') obter(@Param('slug')slug:string){return this.s.obter(slug)} @Post(':slug/submissoes') submeter(@Param('slug')slug:string,@Body()d:any,@Req()r:any){return this.s.submeter(slug,d,r)}}

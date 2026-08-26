@@ -1,0 +1,1 @@
+import { IsEmail, IsOptional, IsString, MinLength } from 'class-validator'; export class CriarUtilizadorInstituicaoDto{@IsString() nome!:string;@IsOptional()@IsString() apelido?:string;@IsEmail() email!:string;@IsOptional()@IsString() telefone?:string;@IsString()@MinLength(6) senha!:string;@IsOptional()@IsString() cargo?:string;}

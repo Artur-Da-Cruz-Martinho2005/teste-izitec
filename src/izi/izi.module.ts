@@ -1,0 +1,2 @@
+import { Module } from '@nestjs/common'; import { IziController } from './izi.controller'; import { IziService } from './izi.service'; import { PrismaService } from '../prisma.service'; import { JwtModule } from '@nestjs/jwt';
+@Module({imports:[JwtModule.register({secret:process.env.JWT_SECRET||'dev-secret'})],controllers:[IziController],providers:[IziService,PrismaService],exports:[IziService]}) export class IziModule{}

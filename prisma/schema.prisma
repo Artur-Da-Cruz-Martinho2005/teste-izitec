@@ -1,0 +1,416 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model UsuarioIzi {
+  id                String             @id @default(uuid())
+  nome              String
+  apelido           String?
+  email             String             @unique
+  telefone          String?
+  senha             String
+  foto              String?
+  cargo             String?
+  status            StatusGeral        @default(ATIVO)
+  emailVerificadoEm DateTime?
+  ultimoAcessoEm    DateTime?
+  criadoEm          DateTime           @default(now())
+  atualizadoEm      DateTime           @updatedAt
+  eliminadoEm       DateTime?
+  perfis            UsuarioPerfilIzi[]
+}
+
+model PerfilIzi {
+  id           String               @id @default(uuid())
+  nome         String               @unique
+  descricao    String?
+  status       StatusGeral          @default(ATIVO)
+  criadoEm     DateTime             @default(now())
+  atualizadoEm DateTime             @updatedAt
+  permissoes   PerfilPermissaoIzi[]
+  usuarios     UsuarioPerfilIzi[]
+}
+
+model PermissaoIzi {
+  id           String               @id @default(uuid())
+  nome         String
+  chave        String               @unique
+  modulo       String
+  descricao    String?
+  criadoEm     DateTime             @default(now())
+  atualizadoEm DateTime             @updatedAt
+  perfis       PerfilPermissaoIzi[]
+}
+
+model UsuarioPerfilIzi {
+  id           String     @id @default(uuid())
+  usuarioIziId String
+  perfilIziId  String
+  criadoEm     DateTime   @default(now())
+  perfil       PerfilIzi  @relation(fields: [perfilIziId], references: [id], onDelete: Cascade)
+  usuario      UsuarioIzi @relation(fields: [usuarioIziId], references: [id], onDelete: Cascade)
+
+  @@unique([usuarioIziId, perfilIziId])
+}
+
+model PerfilPermissaoIzi {
+  id             String       @id @default(uuid())
+  perfilIziId    String
+  permissaoIziId String
+  criadoEm       DateTime     @default(now())
+  perfil         PerfilIzi    @relation(fields: [perfilIziId], references: [id], onDelete: Cascade)
+  permissao      PermissaoIzi @relation(fields: [permissaoIziId], references: [id], onDelete: Cascade)
+
+  @@unique([perfilIziId, permissaoIziId])
+}
+
+model Instituicao {
+  id                  String               @id @default(uuid())
+  nome                String
+  nomeComercial       String?
+  sigla               String?
+  tipo                String
+  nif                 String?
+  email               String?
+  telefone            String?
+  telefoneAlternativo String?
+  website             String?
+  logo                String?
+  descricao           String?
+  pais                String?
+  provincia           String?
+  municipio           String?
+  endereco            String?
+  status              StatusGeral          @default(PENDENTE)
+  criadoEm            DateTime             @default(now())
+  atualizadoEm        DateTime             @updatedAt
+  eliminadoEm         DateTime?
+  formularios         Formulario[]
+  perfis              PerfilInstituicao[]
+  usuarios            UsuarioInstituicao[]
+}
+
+model UsuarioInstituicao {
+  id                String                     @id @default(uuid())
+  instituicaoId     String
+  nome              String
+  apelido           String?
+  email             String
+  telefone          String?
+  senha             String
+  foto              String?
+  cargo             String?
+  status            StatusGeral                @default(PENDENTE)
+  emailVerificadoEm DateTime?
+  ultimoAcessoEm    DateTime?
+  criadoEm          DateTime                   @default(now())
+  atualizadoEm      DateTime                   @updatedAt
+  eliminadoEm       DateTime?
+  formularios       Formulario[]
+  formularioVersaos FormularioVersao[]
+  instituicao       Instituicao                @relation(fields: [instituicaoId], references: [id], onDelete: Cascade)
+  perfis            UsuarioPerfilInstituicao[]
+
+  @@unique([instituicaoId, email])
+}
+
+model PerfilInstituicao {
+  id            String                       @id @default(uuid())
+  instituicaoId String
+  nome          String
+  descricao     String?
+  status        StatusGeral                  @default(ATIVO)
+  criadoEm      DateTime                     @default(now())
+  atualizadoEm  DateTime                     @updatedAt
+  instituicao   Instituicao                  @relation(fields: [instituicaoId], references: [id], onDelete: Cascade)
+  permissoes    PerfilPermissaoInstituicao[]
+  usuarios      UsuarioPerfilInstituicao[]
+
+  @@unique([instituicaoId, nome])
+}
+
+model PermissaoInstituicao {
+  id           String                       @id @default(uuid())
+  nome         String
+  chave        String                       @unique
+  modulo       String
+  descricao    String?
+  criadoEm     DateTime                     @default(now())
+  atualizadoEm DateTime                     @updatedAt
+  perfis       PerfilPermissaoInstituicao[]
+}
+
+model UsuarioPerfilInstituicao {
+  id                   String             @id @default(uuid())
+  usuarioInstituicaoId String
+  perfilInstituicaoId  String
+  criadoEm             DateTime           @default(now())
+  perfil               PerfilInstituicao  @relation(fields: [perfilInstituicaoId], references: [id], onDelete: Cascade)
+  usuario              UsuarioInstituicao @relation(fields: [usuarioInstituicaoId], references: [id], onDelete: Cascade)
+
+  @@unique([usuarioInstituicaoId, perfilInstituicaoId])
+}
+
+model PerfilPermissaoInstituicao {
+  id                     String               @id @default(uuid())
+  perfilInstituicaoId    String
+  permissaoInstituicaoId String
+  criadoEm               DateTime             @default(now())
+  perfil                 PerfilInstituicao    @relation(fields: [perfilInstituicaoId], references: [id], onDelete: Cascade)
+  permissao              PermissaoInstituicao @relation(fields: [permissaoInstituicaoId], references: [id], onDelete: Cascade)
+
+  @@unique([perfilInstituicaoId, permissaoInstituicaoId])
+}
+
+model Formulario {
+  id            String                 @id @default(uuid())
+  instituicaoId String
+  nome          String
+  codigo        String
+  descricao     String?
+  finalidade    String?
+  tipoAcesso    TipoAcesso             @default(PUBLICO)
+  status        StatusGeral            @default(RASCUNHO)
+  versaoAtualId String?
+  criadoPor     String
+  publicadoEm   DateTime?
+  encerradoEm   DateTime?
+  criadoEm      DateTime               @default(now())
+  atualizadoEm  DateTime               @updatedAt
+  eliminadoEm   DateTime?
+  criador       UsuarioInstituicao     @relation(fields: [criadoPor], references: [id])
+  instituicao   Instituicao            @relation(fields: [instituicaoId], references: [id], onDelete: Cascade)
+  links         FormularioLink[]
+  publicacoes   FormularioPublicacao[]
+  versoes       FormularioVersao[]
+  submissoes    Submissao[]
+
+  @@unique([instituicaoId, codigo])
+}
+
+model FormularioVersao {
+  id           String                 @id @default(uuid())
+  formularioId String
+  numero       Int
+  nome         String?
+  descricao    String?
+  status       StatusGeral            @default(RASCUNHO)
+  publicadoEm  DateTime?
+  criadoPor    String
+  criadoEm     DateTime               @default(now())
+  atualizadoEm DateTime               @updatedAt
+  etapas       FormularioEtapa[]
+  publicacoes  FormularioPublicacao[]
+  criador      UsuarioInstituicao     @relation(fields: [criadoPor], references: [id])
+  formulario   Formulario             @relation(fields: [formularioId], references: [id], onDelete: Cascade)
+  submissoes   Submissao[]
+
+  @@unique([formularioId, numero])
+}
+
+model FormularioEtapa {
+  id                 String            @id @default(uuid())
+  formularioVersaoId String
+  nome               String
+  descricao          String?
+  ordem              Int
+  obrigatoria        Boolean           @default(true)
+  status             StatusGeral       @default(ATIVO)
+  criadoEm           DateTime          @default(now())
+  atualizadoEm       DateTime          @updatedAt
+  versao             FormularioVersao  @relation(fields: [formularioVersaoId], references: [id], onDelete: Cascade)
+  secoes             FormularioSecao[]
+
+  @@unique([formularioVersaoId, ordem])
+}
+
+model FormularioSecao {
+  id           String            @id @default(uuid())
+  etapaId      String
+  nome         String
+  descricao    String?
+  ordem        Int
+  status       StatusGeral       @default(ATIVO)
+  criadoEm     DateTime          @default(now())
+  atualizadoEm DateTime          @updatedAt
+  campos       FormularioCampo[]
+  etapa        FormularioEtapa   @relation(fields: [etapaId], references: [id], onDelete: Cascade)
+
+  @@unique([etapaId, ordem])
+}
+
+model FormularioCampo {
+  id                 String              @id @default(uuid())
+  secaoId            String
+  codigo             String
+  nome               String
+  rotulo             String
+  descricao          String?
+  tipo               String
+  ordem              Int
+  obrigatorio        Boolean             @default(false)
+  visivel            Boolean             @default(true)
+  editavel           Boolean             @default(true)
+  configuracao       Json?
+  valorPadrao        Json?
+  placeholder        String?
+  status             StatusGeral         @default(ATIVO)
+  criadoEm           DateTime            @default(now())
+  atualizadoEm       DateTime            @updatedAt
+  dependencias       CampoDependencia[]  @relation("CampoDependente")
+  dependenciasOrigem CampoDependencia[]  @relation("CampoOrigem")
+  opcoes             CampoOpcao[]
+  regras             CampoRegra[]
+  secao              FormularioSecao     @relation(fields: [secaoId], references: [id], onDelete: Cascade)
+  respostas          SubmissaoResposta[]
+
+  @@unique([secaoId, codigo])
+  @@unique([secaoId, ordem])
+}
+
+model CampoOpcao {
+  id           String          @id @default(uuid())
+  campoId      String
+  valor        String
+  rotulo       String
+  descricao    String?
+  ordem        Int
+  status       StatusGeral     @default(ATIVO)
+  criadoEm     DateTime        @default(now())
+  atualizadoEm DateTime        @updatedAt
+  campo        FormularioCampo @relation(fields: [campoId], references: [id], onDelete: Cascade)
+
+  @@unique([campoId, valor])
+  @@unique([campoId, ordem])
+}
+
+model CampoRegra {
+  id           String          @id @default(uuid())
+  campoId      String
+  tipoRegra    String
+  valor        Json?
+  acao         String
+  mensagem     String?
+  ordem        Int             @default(1)
+  status       StatusGeral     @default(ATIVO)
+  criadoEm     DateTime        @default(now())
+  atualizadoEm DateTime        @updatedAt
+  campo        FormularioCampo @relation(fields: [campoId], references: [id], onDelete: Cascade)
+}
+
+model CampoDependencia {
+  id            String          @id @default(uuid())
+  campoId       String
+  campoOrigemId String
+  operador      String
+  valor         Json?
+  acao          String
+  criadoEm      DateTime        @default(now())
+  atualizadoEm  DateTime        @updatedAt
+  campo         FormularioCampo @relation("CampoDependente", fields: [campoId], references: [id], onDelete: Cascade)
+  origem        FormularioCampo @relation("CampoOrigem", fields: [campoOrigemId], references: [id], onDelete: Cascade)
+}
+
+model FormularioPublicacao {
+  id                 String           @id @default(uuid())
+  formularioId       String
+  formularioVersaoId String
+  dataInicio         DateTime?
+  dataFim            DateTime?
+  limiteSubmissoes   Int?
+  totalSubmissoes    Int              @default(0)
+  status             StatusGeral      @default(PUBLICADO)
+  criadoEm           DateTime         @default(now())
+  atualizadoEm       DateTime         @updatedAt
+  links              FormularioLink[]
+  formulario         Formulario       @relation(fields: [formularioId], references: [id], onDelete: Cascade)
+  versao             FormularioVersao @relation(fields: [formularioVersaoId], references: [id], onDelete: Cascade)
+  submissoes         Submissao[]
+}
+
+model FormularioLink {
+  id           String               @id @default(uuid())
+  formularioId String
+  publicacaoId String
+  slug         String               @unique
+  token        String               @unique
+  urlPublica   String
+  status       StatusGeral          @default(ATIVO)
+  dataInicio   DateTime?
+  dataFim      DateTime?
+  criadoEm     DateTime             @default(now())
+  atualizadoEm DateTime             @updatedAt
+  formulario   Formulario           @relation(fields: [formularioId], references: [id], onDelete: Cascade)
+  publicacao   FormularioPublicacao @relation(fields: [publicacaoId], references: [id], onDelete: Cascade)
+}
+
+model Respondente {
+  id            String      @id @default(uuid())
+  nome          String?
+  email         String?
+  telefone      String?
+  identificador String?
+  criadoEm      DateTime    @default(now())
+  atualizadoEm  DateTime    @updatedAt
+  submissoes    Submissao[]
+}
+
+model Submissao {
+  id                 String                @id @default(uuid())
+  formularioId       String
+  formularioVersaoId String
+  publicacaoId       String?
+  respondenteId      String?
+  codigo             String                @unique
+  status             StatusGeral           @default(SUBMETIDA)
+  ip                 String?
+  userAgent          String?
+  submetidoEm        DateTime?
+  criadoEm           DateTime              @default(now())
+  atualizadoEm       DateTime              @updatedAt
+  formulario         Formulario            @relation(fields: [formularioId], references: [id])
+  versao             FormularioVersao      @relation(fields: [formularioVersaoId], references: [id])
+  publicacao         FormularioPublicacao? @relation(fields: [publicacaoId], references: [id])
+  respondente        Respondente?          @relation(fields: [respondenteId], references: [id])
+  respostas          SubmissaoResposta[]
+}
+
+model SubmissaoResposta {
+  id            String          @id @default(uuid())
+  submissaoId   String
+  campoId       String
+  valorTexto    String?
+  valorNumerico BigInt?
+  valorDecimal  Decimal?
+  valorData     DateTime?
+  valorBooleano Boolean?
+  valorJson     Json?
+  criadoEm      DateTime        @default(now())
+  atualizadoEm  DateTime        @updatedAt
+  campo         FormularioCampo @relation(fields: [campoId], references: [id])
+  submissao     Submissao       @relation(fields: [submissaoId], references: [id], onDelete: Cascade)
+
+  @@unique([submissaoId, campoId])
+}
+
+enum StatusGeral {
+  ATIVO
+  INATIVO
+  SUSPENSO
+  PENDENTE
+  REJEITADO
+  RASCUNHO
+  PUBLICADO
+  ENCERRADO
+  SUBMETIDA
+}
+
+enum TipoAcesso {
+  PUBLICO
+  PRIVADO
+}
