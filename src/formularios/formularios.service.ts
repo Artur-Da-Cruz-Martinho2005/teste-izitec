@@ -1,17 +1,18 @@
-import * as crypto from 'crypto';
+import * as crypto from "crypto";
 import {
   BadRequestException,
   ConflictException,
   Injectable,
   NotFoundException,
-} from '@nestjs/common';
+} from "@nestjs/common";
 
-import { PrismaService } from '../prisma.service';
-import { slugify } from '../common/slug';
+import { PrismaService } from "../prisma.service";
+import { slugify } from "../common/slug";
 
-import { CriarFormularioDto } from './dto/criar-formulario.dto';
-import { CriarVersaoDto } from './dto/criar-versao.dto';
-
+import { CriarFormularioDto } from "./dto/criar-formulario.dto";
+import { CriarVersaoDto } from "./dto/criar-versao.dto";
+import { PaginacaoDto } from "src/common/paginacao.dto";
+import { getPaginationParams, buildPaginationMeta } from "../common/paginacao";
 import {
   CriarCampoDto,
   CriarDependenciaDto,
@@ -19,7 +20,7 @@ import {
   CriarOpcaoDto,
   CriarRegraDto,
   CriarSecaoDto,
-} from './dto/estrutura.dto';
+} from "./dto/estrutura.dto";
 
 @Injectable()
 export class FormulariosService {
@@ -35,7 +36,7 @@ export class FormulariosService {
     });
 
     if (!f) {
-      throw new NotFoundException('Formulário não encontrado');
+      throw new NotFoundException("Formulário não encontrado");
     }
 
     return f;
@@ -52,7 +53,7 @@ export class FormulariosService {
     });
 
     if (existente) {
-      throw new ConflictException('Código já utilizado');
+      throw new ConflictException("Código já utilizado");
     }
 
     return this.p.formulario.create({
@@ -63,35 +64,47 @@ export class FormulariosService {
         codigo: d.codigo,
         descricao: d.descricao,
         finalidade: d.finalidade,
-        tipoAcesso: d.tipoAcesso || 'PUBLICO',
-        status: 'RASCUNHO',
+        tipoAcesso: d.tipoAcesso || "PUBLICO",
+        status: "RASCUNHO",
       },
     });
   }
 
-  async listar(inst: string) {
-    return this.p.formulario.findMany({
-      where: {
-        instituicaoId: inst,
-        eliminadoEm: null,
-      },
-      include: {
-        versoes: {
-          orderBy: {
-            numero: 'desc',
+  async listar(inst: string, paginacao?: PaginacaoDto) {
+    const { page = 1, limit = 10 } = paginacao ?? {};
+    const { skip, take } = getPaginationParams({ page, limit });
+
+    const where = {
+      instituicaoId: inst,
+      eliminadoEm: null,
+    };
+
+    const [data, total] = await this.p.$transaction([
+      this.p.formulario.findMany({
+        where,
+        include: {
+          versoes: {
+            orderBy: {
+              numero: "desc",
+            },
+            take: 1,
           },
-          take: 1,
-        },
-        links: {
-          where: {
-            status: 'ATIVO',
+          links: {
+            where: {
+              status: "ATIVO",
+            },
           },
         },
-      },
-      orderBy: {
-        criadoEm: 'desc',
-      },
-    });
+        orderBy: {
+          criadoEm: "desc",
+        },
+        skip,
+        take,
+      }),
+      this.p.formulario.count({ where }),
+    ]);
+
+    return { data, meta: buildPaginationMeta(total, page, limit) };
   }
 
   async detalhe(inst: string, id: string) {
@@ -104,27 +117,27 @@ export class FormulariosService {
       include: {
         versoes: {
           orderBy: {
-            numero: 'asc',
+            numero: "asc",
           },
           include: {
             etapas: {
               orderBy: {
-                ordem: 'asc',
+                ordem: "asc",
               },
               include: {
                 secoes: {
                   orderBy: {
-                    ordem: 'asc',
+                    ordem: "asc",
                   },
                   include: {
                     campos: {
                       orderBy: {
-                        ordem: 'asc',
+                        ordem: "asc",
                       },
                       include: {
                         opcoes: {
                           orderBy: {
-                            ordem: 'asc',
+                            ordem: "asc",
                           },
                         },
                         regras: true,
@@ -146,12 +159,7 @@ export class FormulariosService {
     });
   }
 
-  async criarVersao(
-    inst: string,
-    uid: string,
-    id: string,
-    d: CriarVersaoDto,
-  ) {
+  async criarVersao(inst: string, uid: string, id: string, d: CriarVersaoDto) {
     await this.formulario(id, inst);
 
     const last = await this.p.formularioVersao.findFirst({
@@ -159,7 +167,7 @@ export class FormulariosService {
         formularioId: id,
       },
       orderBy: {
-        numero: 'desc',
+        numero: "desc",
       },
     });
 
@@ -170,7 +178,7 @@ export class FormulariosService {
         nome: d.nome,
         descricao: d.descricao,
         criadoPor: uid,
-        status: 'RASCUNHO',
+        status: "RASCUNHO",
       },
     });
   }
@@ -187,24 +195,17 @@ export class FormulariosService {
     });
 
     if (!v) {
-      throw new NotFoundException('Versão não encontrada');
+      throw new NotFoundException("Versão não encontrada");
     }
 
-    if (v.status === 'PUBLICADO') {
-      throw new BadRequestException(
-        'Versão publicada não pode ser alterada',
-      );
+    if (v.status === "PUBLICADO") {
+      throw new BadRequestException("Versão publicada não pode ser alterada");
     }
 
     return v;
   }
 
-  async etapa(
-    inst: string,
-    id: string,
-    vid: string,
-    d: CriarEtapaDto,
-  ) {
+  async etapa(inst: string, id: string, vid: string, d: CriarEtapaDto) {
     await this.versao(inst, id, vid);
 
     return this.p.formularioEtapa.create({
@@ -232,7 +233,7 @@ export class FormulariosService {
     });
 
     if (!e) {
-      throw new NotFoundException('Etapa não encontrada');
+      throw new NotFoundException("Etapa não encontrada");
     }
 
     return this.p.formularioSecao.create({
@@ -262,7 +263,7 @@ export class FormulariosService {
     });
 
     if (!s) {
-      throw new NotFoundException('Secção não encontrada');
+      throw new NotFoundException("Secção não encontrada");
     }
 
     return this.p.formularioCampo.create({
@@ -305,7 +306,7 @@ export class FormulariosService {
     });
 
     if (!c) {
-      throw new NotFoundException('Campo não encontrado');
+      throw new NotFoundException("Campo não encontrado");
     }
 
     return this.p.campoOpcao.create({
@@ -337,7 +338,7 @@ export class FormulariosService {
     });
 
     if (!c) {
-      throw new NotFoundException('Campo não encontrado');
+      throw new NotFoundException("Campo não encontrado");
     }
 
     return this.p.campoRegra.create({
@@ -384,13 +385,11 @@ export class FormulariosService {
     });
 
     if (!c || !o) {
-      throw new NotFoundException('Campo não encontrado');
+      throw new NotFoundException("Campo não encontrado");
     }
 
     if (c.id === o.id) {
-      throw new BadRequestException(
-        'Um campo não pode depender de si próprio',
-      );
+      throw new BadRequestException("Um campo não pode depender de si próprio");
     }
 
     return this.p.campoDependencia.create({
@@ -425,9 +424,7 @@ export class FormulariosService {
     });
 
     if (estrutura === 0) {
-      throw new BadRequestException(
-        'A versão precisa de pelo menos uma etapa',
-      );
+      throw new BadRequestException("A versão precisa de pelo menos uma etapa");
     }
 
     const campos = await this.p.formularioCampo.count({
@@ -441,12 +438,10 @@ export class FormulariosService {
     });
 
     if (campos === 0) {
-      throw new BadRequestException(
-        'A versão precisa de pelo menos um campo',
-      );
+      throw new BadRequestException("A versão precisa de pelo menos um campo");
     }
 
-    const base = op.urlBase || 'http://localhost:3000';
+    const base = op.urlBase || "http://localhost:3000";
 
     let slug = slugify(`${f.nome}-${v.numero}`);
     let n = 1;
@@ -466,14 +461,10 @@ export class FormulariosService {
         data: {
           formularioId: id,
           formularioVersaoId: vid,
-          dataInicio: op.dataInicio
-            ? new Date(op.dataInicio)
-            : new Date(),
-          dataFim: op.dataFim
-            ? new Date(op.dataFim)
-            : undefined,
+          dataInicio: op.dataInicio ? new Date(op.dataInicio) : new Date(),
+          dataFim: op.dataFim ? new Date(op.dataFim) : undefined,
           limiteSubmissoes: op.limiteSubmissoes,
-          status: 'PUBLICADO',
+          status: "PUBLICADO",
         },
       });
 
@@ -494,7 +485,7 @@ export class FormulariosService {
           id: vid,
         },
         data: {
-          status: 'PUBLICADO',
+          status: "PUBLICADO",
           publicadoEm: new Date(),
         },
       });
@@ -504,7 +495,7 @@ export class FormulariosService {
           id,
         },
         data: {
-          status: 'PUBLICADO',
+          status: "PUBLICADO",
           versaoAtualId: vid,
           publicadoEm: new Date(),
         },
@@ -519,26 +510,37 @@ export class FormulariosService {
     });
   }
 
-  async submissoes(inst: string, id: string) {
+  async submissoes(inst: string, id: string, paginacao?: PaginacaoDto) {
+    // paginacao para criar limites de dados
+    const { page = 1, limit = 10 } = paginacao ?? {};
+    const { skip, take } = getPaginationParams({ page, limit });
     await this.formulario(id, inst);
-
-    const rows = await this.p.submissao.findMany({
-      where: {
-        formularioId: id,
-      },
-      include: {
-        respondente: true,
-        respostas: {
-          include: {
-            campo: true,
+    const [data, total] = await this.p.$transaction([
+      this.p.submissao.findMany({
+        where: {
+          formularioId: id,
+        },
+        include: {
+          respondente: true,
+          respostas: {
+            include: {
+              campo: true,
+            },
           },
         },
-      },
-      orderBy: {
-        criadoEm: 'desc',
-      },
-    });
+        orderBy: {
+          criadoEm: "desc",
+        },
+        skip,
+        take,
+      }),
+      this.p.submissao.count({
+        where: {
+          formularioId: id,
+        },
+      }),
+    ]);
 
-    return rows;
+    return { data, meta: buildPaginationMeta(total, page, limit) };
   }
 }

@@ -1,2 +1,14 @@
-import { Module } from '@nestjs/common'; import { JwtModule } from '@nestjs/jwt'; import { InstituicoesController } from './instituicoes.controller'; import { InstituicoesService } from './instituicoes.service'; import { PrismaService } from '../prisma.service';
-@Module({imports:[JwtModule.register({secret:process.env.JWT_SECRET||'dev-secret'})],controllers:[InstituicoesController],providers:[InstituicoesService,PrismaService],exports:[InstituicoesService]}) export class InstituicoesModule{}
+import { Module } from "@nestjs/common";
+import { JwtModule } from "@nestjs/jwt";
+import { InstituicoesController } from "./instituicoes.controller";
+import { InstituicoesService } from "./instituicoes.service";
+import { PrismaService } from "../prisma.service";
+@Module({
+  imports: [
+    JwtModule.register({ secret: process.env.JWT_SECRET || "dev-secret" }),
+  ],
+  controllers: [InstituicoesController],
+  providers: [InstituicoesService, PrismaService],
+  exports: [InstituicoesService],
+})
+export class InstituicoesModule {}
