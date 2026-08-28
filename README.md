@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 # Inscreve.AO — API Base Fase 1
 
 Base funcional da primeira fase: IZI valida instituições; instituição cria conta, faz login e cria utilizadores; utilizadores autorizados criam formulários dinâmicos, versões, etapas, secções, campos, opções, regras e dependências; instituição publica; público consulta e submete; instituição consulta submissões.
