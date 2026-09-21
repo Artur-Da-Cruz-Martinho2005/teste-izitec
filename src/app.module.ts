@@ -3,7 +3,7 @@ import { JwtModule } from "@nestjs/jwt";
 import { PrismaService } from "./prisma.service";
 import { IziModule } from "./izi/izi.module";
 import { InstituicoesModule } from "./instituicoes/instituicoes.module";
-import { FormulariosModule } from "./formularios/formularios.module";
+import { FormulariosModule } from "./formularios/fomularioModule";
 import { PublicoModule } from "./publico/publico.module";
 
 @Module({

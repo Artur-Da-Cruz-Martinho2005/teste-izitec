@@ -1,18 +1,21 @@
-import * as crypto from "crypto";
+import { randomUUID } from "node:crypto";
+
 import {
   BadRequestException,
   ConflictException,
+  ForbiddenException,
   Injectable,
   NotFoundException,
 } from "@nestjs/common";
+import { CampoDependencia, Prisma } from "@prisma/client";
 
 import { PrismaService } from "../prisma.service";
+import { PaginacaoDto } from "../common/paginacao.dto";
 import { slugify } from "../common/slug";
+import { getPaginationParams, buildPaginationMeta } from "../common/paginacao";
 
 import { CriarFormularioDto } from "./dto/criar-formulario.dto";
 import { CriarVersaoDto } from "./dto/criar-versao.dto";
-import { PaginacaoDto } from "src/common/paginacao.dto";
-import { getPaginationParams, buildPaginationMeta } from "../common/paginacao";
 import {
   CriarCampoDto,
   CriarDependenciaDto,
@@ -20,55 +23,11 @@ import {
   CriarOpcaoDto,
   CriarRegraDto,
   CriarSecaoDto,
-} from "./dto/estrutura.dto";
+} from "./dto/campoDto";
 
 @Injectable()
-export class FormulariosService {
+export class formularioService {
   constructor(private p: PrismaService) {}
-
-  private async formulario(id: string, inst: string) {
-    const f = await this.p.formulario.findFirst({
-      where: {
-        id,
-        instituicaoId: inst,
-        eliminadoEm: null,
-      },
-    });
-
-    if (!f) {
-      throw new NotFoundException("Formulário não encontrado");
-    }
-
-    return f;
-  }
-
-  async criar(inst: string, uid: string, d: CriarFormularioDto) {
-    const existente = await this.p.formulario.findUnique({
-      where: {
-        instituicaoId_codigo: {
-          instituicaoId: inst,
-          codigo: d.codigo,
-        },
-      },
-    });
-
-    if (existente) {
-      throw new ConflictException("Código já utilizado");
-    }
-
-    return this.p.formulario.create({
-      data: {
-        instituicaoId: inst,
-        criadoPor: uid,
-        nome: d.nome,
-        codigo: d.codigo,
-        descricao: d.descricao,
-        finalidade: d.finalidade,
-        tipoAcesso: d.tipoAcesso || "PUBLICO",
-        status: "RASCUNHO",
-      },
-    });
-  }
 
   async listar(inst: string, paginacao?: PaginacaoDto) {
     const { page = 1, limit = 10 } = paginacao ?? {};
@@ -159,250 +118,194 @@ export class FormulariosService {
     });
   }
 
-  async criarVersao(inst: string, uid: string, id: string, d: CriarVersaoDto) {
-    await this.formulario(id, inst);
-
-    const last = await this.p.formularioVersao.findFirst({
-      where: {
-        formularioId: id,
-      },
-      orderBy: {
-        numero: "desc",
-      },
+  private async formulario(id: string, inst: string) {
+    const f = await this.p.formulario.findFirst({
+      where: { id, instituicaoId: inst, eliminadoEm: null },
     });
 
-    return this.p.formularioVersao.create({
-      data: {
-        formularioId: id,
-        numero: (last?.numero || 0) + 1,
-        nome: d.nome,
-        descricao: d.descricao,
-        criadoPor: uid,
-        status: "RASCUNHO",
-      },
-    });
+    if (!f) {
+      throw new NotFoundException("Formulário não encontrado");
+    }
+
+    return f;
   }
 
-  private async versao(inst: string, id: string, vid: string) {
+  private async versao(inst: string, formularioId: string, vid: string) {
+    await this.formulario(formularioId, inst);
+
     const v = await this.p.formularioVersao.findFirst({
-      where: {
-        id: vid,
-        formularioId: id,
-        formulario: {
-          instituicaoId: inst,
-        },
-      },
+      where: { id: vid, formularioId },
     });
 
     if (!v) {
       throw new NotFoundException("Versão não encontrada");
     }
 
-    if (v.status === "PUBLICADO") {
-      throw new BadRequestException("Versão publicada não pode ser alterada");
-    }
-
     return v;
   }
 
-  async etapa(inst: string, id: string, vid: string, d: CriarEtapaDto) {
-    await this.versao(inst, id, vid);
-
-    return this.p.formularioEtapa.create({
-      data: {
-        formularioVersaoId: vid,
-        ...d,
-      },
-    });
-  }
-
-  async secao(
-    inst: string,
-    id: string,
-    vid: string,
-    eid: string,
-    d: CriarSecaoDto,
+  async criarFormulario(
+    uid: string,
+    dtoFormulario: CriarFormularioDto,
+    versaoDto: CriarVersaoDto,
+    etapaDto: CriarEtapaDto,
+    secaoDto: CriarSecaoDto,
+    campoDto: CriarCampoDto,
+    opcaoDto: CriarOpcaoDto,
+    regraDto: CriarRegraDto,
+    dependenciaDto?: CriarDependenciaDto,
   ) {
-    await this.versao(inst, id, vid);
-
-    const e = await this.p.formularioEtapa.findFirst({
-      where: {
-        id: eid,
-        formularioVersaoId: vid,
-      },
-    });
-
-    if (!e) {
-      throw new NotFoundException("Etapa não encontrada");
+    if (!uid) {
+      throw new BadRequestException("Token inválido.");
     }
 
-    return this.p.formularioSecao.create({
-      data: {
-        etapaId: eid,
-        ...d,
-      },
-    });
-  }
+    try {
+      return await this.p.$transaction(async (tx) => {
+        const usuario = await tx.usuarioInstituicao.findFirst({
+          where: { id: uid, eliminadoEm: null },
+          select: { id: true, instituicaoId: true },
+        });
 
-  async campo(
-    inst: string,
-    id: string,
-    vid: string,
-    sid: string,
-    d: CriarCampoDto,
-  ) {
-    await this.versao(inst, id, vid);
+        if (!usuario) {
+          throw new ForbiddenException("Utilizador não encontrado.");
+        }
 
-    const s = await this.p.formularioSecao.findFirst({
-      where: {
-        id: sid,
-        etapa: {
-          formularioVersaoId: vid,
-        },
-      },
-    });
-
-    if (!s) {
-      throw new NotFoundException("Secção não encontrada");
-    }
-
-    return this.p.formularioCampo.create({
-      data: {
-        secaoId: sid,
-        codigo: d.codigo,
-        nome: d.nome,
-        rotulo: d.rotulo,
-        descricao: d.descricao,
-        tipo: d.tipo,
-        ordem: d.ordem,
-        obrigatorio: d.obrigatorio ?? false,
-        visivel: d.visivel ?? true,
-        editavel: d.editavel ?? true,
-        configuracao: d.configuracao,
-        valorPadrao: d.valorPadrao,
-        placeholder: d.placeholder,
-      },
-    });
-  }
-
-  async opcao(
-    inst: string,
-    id: string,
-    vid: string,
-    cid: string,
-    d: CriarOpcaoDto,
-  ) {
-    await this.versao(inst, id, vid);
-
-    const c = await this.p.formularioCampo.findFirst({
-      where: {
-        id: cid,
-        secao: {
-          etapa: {
-            formularioVersaoId: vid,
+        const formulario = await tx.formulario.create({
+          data: {
+            instituicaoId: usuario.instituicaoId,
+            criadoPor: usuario.id,
+            nome: dtoFormulario.nome,
+            codigo: dtoFormulario.codigo,
+            descricao: dtoFormulario.descricao,
+            finalidade: dtoFormulario.finalidade,
+            tipoAcesso: dtoFormulario.tipoAcesso ?? "PUBLICO",
+            status: "RASCUNHO",
           },
-        },
-      },
-    });
+        });
 
-    if (!c) {
-      throw new NotFoundException("Campo não encontrado");
+        const versao = await tx.formularioVersao.create({
+          data: {
+            formularioId: formulario.id,
+            numero: 1, // formulário novo: primeira versão
+            nome: versaoDto.nome,
+            descricao: versaoDto.descricao,
+            criadoPor: usuario.id,
+            status: "RASCUNHO",
+          },
+        });
+
+        const etapa = await tx.formularioEtapa.create({
+          data: { ...etapaDto, formularioVersaoId: versao.id },
+        });
+
+        const secao = await tx.formularioSecao.create({
+          data: { ...secaoDto, etapaId: etapa.id },
+        });
+
+        // ordem do campo: a do DTO, ou a próxima da seção
+        const maxCampo = await tx.formularioCampo.aggregate({
+          where: { secaoId: secao.id },
+          _max: { ordem: true },
+        });
+
+        const campo = await tx.formularioCampo.create({
+          data: {
+            secaoId: secao.id,
+            codigo: campoDto.codigo,
+            nome: campoDto.nome,
+            rotulo: campoDto.rotulo,
+            descricao: campoDto.descricao,
+            tipo: campoDto.tipo,
+            ordem: campoDto.ordem ?? (maxCampo._max.ordem ?? 0) + 1,
+            obrigatorio: campoDto.obrigatorio ?? false,
+            visivel: campoDto.visivel ?? true,
+            editavel: campoDto.editavel ?? true,
+            configuracao: campoDto.configuracao,
+            valorPadrao: campoDto.valorPadrao,
+            placeholder: campoDto.placeholder,
+          },
+        });
+
+        const opcao = await tx.campoOpcao.create({
+          data: { ...opcaoDto, campoId: campo.id },
+        });
+
+        // ordem da regra: a do DTO, ou a próxima do campo
+        const maxRegra = await tx.campoRegra.aggregate({
+          where: { campoId: campo.id },
+          _max: { ordem: true },
+        });
+
+        const regra = await tx.campoRegra.create({
+          data: {
+            campoId: campo.id,
+            tipoRegra: regraDto.tipoRegra,
+            valor: regraDto.valor,
+            acao: regraDto.acao,
+            mensagem: regraDto.mensagem,
+            ordem: regraDto.ordem ?? (maxRegra._max.ordem ?? 0) + 1,
+          },
+        });
+
+        let dependencia: CampoDependencia | null = null;
+
+        if (dependenciaDto) {
+          if (!dependenciaDto.campoOrigemId) {
+            throw new BadRequestException("campoOrigemId é obrigatório.");
+          }
+
+          if (dependenciaDto.campoOrigemId === campo.id) {
+            throw new BadRequestException(
+              "Um campo não pode depender de si mesmo.",
+            );
+          }
+
+          const origem = await tx.formularioCampo.findFirst({
+            where: {
+              id: dependenciaDto.campoOrigemId,
+              secao: { etapa: { formularioVersaoId: versao.id } },
+            },
+            select: { id: true },
+          });
+
+          if (!origem) {
+            throw new BadRequestException("Campo de origem inválido.");
+          }
+
+          dependencia = await tx.campoDependencia.create({
+            data: {
+              campoId: campo.id,
+              campoOrigemId: origem.id,
+              operador: dependenciaDto.operador,
+              valor: dependenciaDto.valor,
+              acao: dependenciaDto.acao,
+            },
+          });
+        }
+
+        return {
+          formulario,
+          versao,
+          etapa,
+          secao,
+          campo,
+          opcao,
+          regra,
+          dependencia,
+        };
+      });
+    } catch (e) {
+      if (
+        e instanceof Prisma.PrismaClientKnownRequestError &&
+        e.code === "P2002"
+      ) {
+        throw new ConflictException("Já existe um registro com esse código.");
+      }
+      throw e;
     }
-
-    return this.p.campoOpcao.create({
-      data: {
-        campoId: cid,
-        ...d,
-      },
-    });
   }
 
-  async regra(
-    inst: string,
-    id: string,
-    vid: string,
-    cid: string,
-    d: CriarRegraDto,
-  ) {
-    await this.versao(inst, id, vid);
-
-    const c = await this.p.formularioCampo.findFirst({
-      where: {
-        id: cid,
-        secao: {
-          etapa: {
-            formularioVersaoId: vid,
-          },
-        },
-      },
-    });
-
-    if (!c) {
-      throw new NotFoundException("Campo não encontrado");
-    }
-
-    return this.p.campoRegra.create({
-      data: {
-        campoId: cid,
-        tipoRegra: d.tipoRegra,
-        valor: d.valor,
-        acao: d.acao,
-        mensagem: d.mensagem,
-        ordem: d.ordem ?? 1,
-      },
-    });
-  }
-
-  async dependencia(
-    inst: string,
-    id: string,
-    vid: string,
-    cid: string,
-    d: CriarDependenciaDto,
-  ) {
-    await this.versao(inst, id, vid);
-
-    const c = await this.p.formularioCampo.findFirst({
-      where: {
-        id: cid,
-        secao: {
-          etapa: {
-            formularioVersaoId: vid,
-          },
-        },
-      },
-    });
-
-    const o = await this.p.formularioCampo.findFirst({
-      where: {
-        id: d.campoOrigemId,
-        secao: {
-          etapa: {
-            formularioVersaoId: vid,
-          },
-        },
-      },
-    });
-
-    if (!c || !o) {
-      throw new NotFoundException("Campo não encontrado");
-    }
-
-    if (c.id === o.id) {
-      throw new BadRequestException("Um campo não pode depender de si próprio");
-    }
-
-    return this.p.campoDependencia.create({
-      data: {
-        campoId: cid,
-        campoOrigemId: d.campoOrigemId,
-        operador: d.operador,
-        valor: d.valor,
-        acao: d.acao,
-      },
-    });
-  }
-
+  // publicar formulário
   async publicar(
     inst: string,
     id: string,
@@ -417,24 +320,16 @@ export class FormulariosService {
     const f = await this.formulario(id, inst);
     const v = await this.versao(inst, id, vid);
 
-    const estrutura = await this.p.formularioEtapa.count({
-      where: {
-        formularioVersaoId: vid,
-      },
+    const etapas = await this.p.formularioEtapa.count({
+      where: { formularioVersaoId: vid },
     });
 
-    if (estrutura === 0) {
+    if (etapas === 0) {
       throw new BadRequestException("A versão precisa de pelo menos uma etapa");
     }
 
     const campos = await this.p.formularioCampo.count({
-      where: {
-        secao: {
-          etapa: {
-            formularioVersaoId: vid,
-          },
-        },
-      },
+      where: { secao: { etapa: { formularioVersaoId: vid } } },
     });
 
     if (campos === 0) {
@@ -446,99 +341,86 @@ export class FormulariosService {
     let slug = slugify(`${f.nome}-${v.numero}`);
     let n = 1;
 
-    while (
-      await this.p.formularioLink.findUnique({
-        where: {
-          slug,
-        },
-      })
-    ) {
+    while (await this.p.formularioLink.findUnique({ where: { slug } })) {
       slug = slugify(`${f.nome}-${v.numero}-${n++}`);
     }
 
-    return this.p.$transaction(async (tx) => {
-      const pub = await tx.formularioPublicacao.create({
-        data: {
-          formularioId: id,
-          formularioVersaoId: vid,
-          dataInicio: op.dataInicio ? new Date(op.dataInicio) : new Date(),
-          dataFim: op.dataFim ? new Date(op.dataFim) : undefined,
-          limiteSubmissoes: op.limiteSubmissoes,
-          status: "PUBLICADO",
-        },
-      });
+    try {
+      return await this.p.$transaction(async (tx) => {
+        const pub = await tx.formularioPublicacao.create({
+          data: {
+            formularioId: id,
+            formularioVersaoId: vid,
+            dataInicio: op.dataInicio ? new Date(op.dataInicio) : new Date(),
+            dataFim: op.dataFim ? new Date(op.dataFim) : undefined,
+            limiteSubmissoes: op.limiteSubmissoes,
+            status: "PUBLICADO",
+          },
+        });
 
-      const link = await tx.formularioLink.create({
-        data: {
-          formularioId: id,
-          publicacaoId: pub.id,
-          slug,
-          token: crypto.randomUUID(),
-          urlPublica: `${base}/formularios/${slug}`,
-          dataInicio: pub.dataInicio,
-          dataFim: pub.dataFim,
-        },
-      });
+        const link = await tx.formularioLink.create({
+          data: {
+            formularioId: id,
+            publicacaoId: pub.id,
+            slug,
+            token: randomUUID(),
+            urlPublica: `${base}/formularios/${slug}`,
+            dataInicio: pub.dataInicio,
+            dataFim: pub.dataFim,
+          },
+        });
 
-      await tx.formularioVersao.update({
-        where: {
-          id: vid,
-        },
-        data: {
-          status: "PUBLICADO",
-          publicadoEm: new Date(),
-        },
-      });
+        await tx.formularioVersao.update({
+          where: { id: vid },
+          data: { status: "PUBLICADO", publicadoEm: new Date() },
+        });
 
-      await tx.formulario.update({
-        where: {
-          id,
-        },
-        data: {
-          status: "PUBLICADO",
-          versaoAtualId: vid,
-          publicadoEm: new Date(),
-        },
-      });
+        await tx.formulario.update({
+          where: { id },
+          data: {
+            status: "PUBLICADO",
+            versaoAtualId: vid,
+            publicadoEm: new Date(),
+          },
+        });
 
-      return {
-        formulario: f.id,
-        versao: v.id,
-        publicacao: pub,
-        link,
-      };
-    });
+        return {
+          formulario: f.id,
+          versao: v.id,
+          publicacao: pub,
+          link,
+        };
+      });
+    } catch (e) {
+      // slug gerado em paralelo por outra requisição
+      if (
+        e instanceof Prisma.PrismaClientKnownRequestError &&
+        e.code === "P2002"
+      ) {
+        throw new ConflictException("Já existe um link com esse slug.");
+      }
+      throw e;
+    }
   }
 
   async submissoes(inst: string, id: string, paginacao?: PaginacaoDto) {
-    // paginacao para criar limites de dados
     const { page = 1, limit = 10 } = paginacao ?? {};
     const { skip, take } = getPaginationParams({ page, limit });
+
     await this.formulario(id, inst);
+
     const [data, total] = await this.p.$transaction([
       this.p.submissao.findMany({
-        where: {
-          formularioId: id,
-        },
+        where: { formularioId: id },
         include: {
           respondente: true,
-          respostas: {
-            include: {
-              campo: true,
-            },
-          },
+          respostas: { include: { campo: true } },
         },
-        orderBy: {
-          criadoEm: "desc",
-        },
+        orderBy: { criadoEm: "desc" },
         skip,
         take,
       }),
-      this.p.submissao.count({
-        where: {
-          formularioId: id,
-        },
-      }),
+      this.p.submissao.count({ where: { formularioId: id } }),
     ]);
 
     return { data, meta: buildPaginationMeta(total, page, limit) };
